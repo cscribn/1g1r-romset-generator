@@ -535,6 +535,7 @@ def main(argv: List[str]):
             'debug',
             'move',
             'symlink',
+            'hardlink',
             'relative',
             'chunk-size=',
             'threads=',
@@ -587,6 +588,7 @@ def main(argv: List[str]):
     language_weight = 3
     move = False
     symlink = False
+    hardlink = False
     relative = False
     global THREADS
     global RULES
@@ -670,6 +672,7 @@ def main(argv: List[str]):
                     sys.exit(help_msg('invalid output DIR: %s' % output_dir))
         move |= opt == '--move'
         symlink |= opt == '--symlink'
+        hardlink |= opt == '--hardlink'
         relative |= opt == '--relative'
         if opt == '--chunk-size':
             CHUNK_SIZE = int(arg)
@@ -940,7 +943,8 @@ def main(argv: List[str]):
                                 rom_output_path,
                                 move,
                                 symlink,
-                                relative)
+                                relative,
+                                hardlink)
                             copied_files.add(rom_input_path)
                     else:
                         log(
@@ -962,9 +966,9 @@ def main(argv: List[str]):
                 if full_path.is_file():
                     if curr_out_dir:
                         curr_out_dir.mkdir(parents=True, exist_ok=True)
-                        if symlink:
+                        if symlink or hardlink:
                             curr_out_dir = curr_out_dir / file_name
-                        transfer_file(full_path, curr_out_dir, move, symlink, relative)
+                        transfer_file(full_path, curr_out_dir, move, symlink, relative, hardlink)
                     else:
                         printed_items.append(file_name)
                     break
@@ -982,7 +986,8 @@ def main(argv: List[str]):
                                     rom_output_dir,
                                     move,
                                     symlink,
-                                    relative)
+                                    relative,
+                                    hardlink)
                                 shutil.copystat(
                                     str(full_path),
                                     str(rom_output_dir))
@@ -1075,17 +1080,21 @@ def transfer_file(
         output_path: Path,
         move: bool,
         symlink: bool,
-        relative: bool) -> None:
+        relative: bool,
+        hardlink: bool) -> None:
     try:
         if move:
             print('Moving [%s] to [%s]' % (input_path, output_path))
             shutil.move(str(input_path), str(output_path))
         elif symlink:
-            print('Linking [%s] to [%s]' % (input_path, output_path))
+            print('Soft linking [%s] to [%s]' % (input_path, output_path))
             if not relative:
                 output_path.symlink_to(input_path.resolve())
             else:
                 output_path.symlink_to(os.path.relpath(input_path, output_path.parent))
+        elif hardlink:
+            print('Hard linking [%s] to [%s]' % (input_path, output_path))
+            output_path.hardlink_to(input_path.resolve())
         else:
             print('Copying [%s] to [%s]' % (input_path, output_path))
             shutil.copy2(str(input_path), str(output_path))
@@ -1144,6 +1153,13 @@ def help_msg(s: Optional[Union[str, Exception]] = None) -> str:
         '\n\t\t\t\t'
         'Please note newer versions of Windows 10 require '
         'elevated privileges to create symlinks',
+
+        '\t--hardlink\t\t'
+        'If set, ROMs will be hard linked '
+        'to the output directory'
+        '\n\t\t\t\t'
+        'Please note hardlinks will not work across '
+        'file systems',
 
         '\t--relative\t\t'
         'If set along with --symlink, will create '
