@@ -731,6 +731,8 @@ def main(argv: List[str]):
         sys.exit(help_msg('Number of threads should be > 0'))
     if MAX_FILE_SIZE <= 0:
         sys.exit(help_msg('Maximum file size should be > 0'))
+    if symlink and hardlink:
+        sys.exit(help_msg('symlink and hardlink are mutually exclusive'))
     try:
         prefer = parse_list(prefer_str, ignore_case, regex, sep)
     except (re.error, OSError) as e:
